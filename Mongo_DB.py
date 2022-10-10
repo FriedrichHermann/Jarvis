@@ -4,7 +4,7 @@ from pymongo import MongoClient
 
 # Create a client instance of MongoClient
 
-client = MongoClient('mongodb+srv://friedrich_hermann:uTkxuhFf2bNU-vIIEY@outbound-production.h7ybo.mongodb.net/outbound')
+client = MongoClient('mongodb+srv://<usr>:<pwd>@outbound-production.h7ybo.mongodb.net/outbound')
 
  
 
