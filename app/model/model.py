@@ -10,6 +10,11 @@ from requests.auth import HTTPBasicAuth
 
 from sklearn.preprocessing import MultiLabelBinarizer
 
+from fastai.tabular import *
+from fastai.tabular.all import *
+from fastai.vision.all import *
+from fastai.data import *
+
 __version__="0.1.0"
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent
@@ -57,53 +62,53 @@ def list_finder(companylist:list, api, fields="id,name,type,deleted,path,tagline
     return data_list
 
 
-#Select only the fields the model uses:
+def predict_pipeline(searchlist:list,api):
+    
+    #Select only the fields the model uses:
 
-data=list_finder(searchlist) #has to be website URL
-df_json=json_normalize(data,sep="->")
+    data=list_finder(searchlist,api) #has to be website URL
+    df_json=json_normalize(data,sep="->")
 
-#1. One hot encode Technologies
-mlb = MultiLabelBinarizer()
-df = df_json.join(pd.DataFrame(mlb.fit_transform(df_json.pop('technologies')),
+    #1. One hot encode Technologies
+    mlb = MultiLabelBinarizer()
+    df = df_json.join(pd.DataFrame(mlb.fit_transform(df_json.pop('technologies')),
                                columns=mlb.classes_,
                                index=df_json.index))
+    #2.Sin cos transform of Date
+
+    #sin,cos transformation of date
+    #transformation into datetime type
+    dateadj_data=df.copy(deep=True)
+    dateadj_data["last_updated_utc"] =  pd.to_datetime(model_data["last_updated_utc"])
+    dateadj_data["kpi_summary->last_update_date_utc"] =  pd.to_datetime(model_data["kpi_summary->last_update_date_utc"])
+    dateadj_data["created_utc"] =  pd.to_datetime(model_data["created_utc"])
+    dateadj_data["launch_year"] =  pd.to_datetime(model_data["launch_year"],format="%Y").dt.year
+
+    #new columns with cos and sin data for month. year will be same. dropping old ones
+    dateadj_data["last_updated_month_cos"]=np.cos(2 * np.pi * dateadj_data["last_updated_utc"].dt.month/12.0)
+    dateadj_data["last_updated_month_sin"]=np.sin(2 * np.pi * dateadj_data["last_updated_utc"].dt.month/12.0)
+    dateadj_data["last_updated_year"]=dateadj_data["last_updated_utc"].dt.year
+
+    dateadj_data["kpi_summary->last_update_date_utc_month_cos"]=np.cos(2 * np.pi * dateadj_data["kpi_summary->last_update_date_utc"].dt.month/12.0)
+    dateadj_data["kpi_summary->last_update_date_utc_month_sin"]=np.sin(2 * np.pi * dateadj_data["kpi_summary->last_update_date_utc"].dt.month/12.0)
+    dateadj_data["kpi_summary->last_update_date_utc_year"]=dateadj_data["kpi_summary->last_update_date_utc"].dt.year
+
+    dateadj_data["created_utc_month_cos"]=np.cos(2 * np.pi * dateadj_data["created_utc"].dt.month/12.0)
+    dateadj_data["created_utc_month_sin"]=np.sin(2 * np.pi * dateadj_data["created_utc"].dt.month/12.0)
+    dateadj_data["created_utc_year"]=dateadj_data["created_utc"].dt.year
+
+    dateadj_data.drop(columns=["last_updated_utc","kpi_summary->last_update_date_utc","created_utc"],inplace=True)
 
 
-#2.Sin cos transform of Date
+    #3. chosing the columns need for the model and applying the model
 
-#sin,cos transformation of date
-#transformation into datetime type
-dateadj_data=model_data.copy(deep=True)
-dateadj_data["last_updated_utc"] =  pd.to_datetime(model_data["last_updated_utc"])
-dateadj_data["kpi_summary->last_update_date_utc"] =  pd.to_datetime(model_data["kpi_summary->last_update_date_utc"])
-dateadj_data["created_utc"] =  pd.to_datetime(model_data["created_utc"])
-dateadj_data["launch_year"] =  pd.to_datetime(model_data["launch_year"],format="%Y").dt.year
+    cols=['type', 'about', 'employees', 'employees_latest', 'growth_stage', 'traffic_summary', 'launch_year', 'has_promising_founder', 'has_strong_founder', 'has_super_founder', 'total_funding', 'last_funding', 'company_status', 'last_updated_utc', 'created_utc', 'employee_3_months_growth_unique', 'job_openings', 'kpi_summary->last_update_date_utc', 'team->total', 'traffic->visitors', '3d technology', 'artificial intelligence', 'augmented reality', 'autonomous & sensor tech', 'big data', 'blockchain', 'computer vision', 'connected device', 'deep learning', 'deep tech', 'hardware', 'iot internetofthings', 'machine learning', 'mobile app', 'nanotech', 'natural language processing', 'quantum technologies', 'recognition technology', 'virtual reality']
+    df_fin=dateadj_data[cols]
 
-#new columns with cos and sin data for month. year will be same. dropping old ones
-dateadj_data["last_updated_month_cos"]=np.cos(2 * np.pi * dateadj_data["last_updated_utc"].dt.month/12.0)
-dateadj_data["last_updated_month_sin"]=np.sin(2 * np.pi * dateadj_data["last_updated_utc"].dt.month/12.0)
-dateadj_data["last_updated_year"]=dateadj_data["last_updated_utc"].dt.year
-
-dateadj_data["kpi_summary->last_update_date_utc_month_cos"]=np.cos(2 * np.pi * dateadj_data["kpi_summary->last_update_date_utc"].dt.month/12.0)
-dateadj_data["kpi_summary->last_update_date_utc_month_sin"]=np.sin(2 * np.pi * dateadj_data["kpi_summary->last_update_date_utc"].dt.month/12.0)
-dateadj_data["kpi_summary->last_update_date_utc_year"]=dateadj_data["kpi_summary->last_update_date_utc"].dt.year
-
-dateadj_data["created_utc_month_cos"]=np.cos(2 * np.pi * dateadj_data["created_utc"].dt.month/12.0)
-dateadj_data["created_utc_month_sin"]=np.sin(2 * np.pi * dateadj_data["created_utc"].dt.month/12.0)
-dateadj_data["created_utc_year"]=dateadj_data["created_utc"].dt.year
-
-dateadj_data.drop(columns=["last_updated_utc","kpi_summary->last_update_date_utc","created_utc"],inplace=True)
+    cont_names, cat_names = cont_cat_split(y)
 
 
+    y_to = TabularPandas(y, procs=[Categorify, FillMissing, Normalize], cat_names=cat_names, cont_names=cont_names, 
+                                    )
 
-
-
-def predict_pipeline(text)
-
-cont_names, cat_names = cont_cat_split(y)
-
-
-y_to = TabularPandas(y, procs=[Categorify, FillMissing, Normalize], cat_names=cat_names, cont_names=cont_names, 
-                                 )
-
-xgb_model.predict(y_to.xs)
+    return model.predict(y_to.xs)
