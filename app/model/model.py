@@ -1,19 +1,17 @@
+import json
 import pickle
 import re
 from pathlib import Path
 
 import pandas as pd
 import requests
-import json
-from pandas.io.json import json_normalize
-from requests.auth import HTTPBasicAuth
-
-from sklearn.preprocessing import MultiLabelBinarizer
-
+from fastai.data import *
 from fastai.tabular import *
 from fastai.tabular.all import *
 from fastai.vision.all import *
-from fastai.data import *
+from pandas.io.json import json_normalize
+from requests.auth import HTTPBasicAuth
+from sklearn.preprocessing import MultiLabelBinarizer
 
 __version__="0.1.0"
 
@@ -65,8 +63,9 @@ def list_finder(companylist:list, api, fields="id,name,type,deleted,path,tagline
 def predict_pipeline(searchlist:list,api):
     
     #Select only the fields the model uses:
-
+    print("before")
     data=list_finder(searchlist,api) #has to be website URL
+    print("after")
     df_json=json_normalize(data,sep="->")
 
     #1. One hot encode Technologies
@@ -79,10 +78,10 @@ def predict_pipeline(searchlist:list,api):
     #sin,cos transformation of date
     #transformation into datetime type
     dateadj_data=df.copy(deep=True)
-    dateadj_data["last_updated_utc"] =  pd.to_datetime(model_data["last_updated_utc"])
-    dateadj_data["kpi_summary->last_update_date_utc"] =  pd.to_datetime(model_data["kpi_summary->last_update_date_utc"])
-    dateadj_data["created_utc"] =  pd.to_datetime(model_data["created_utc"])
-    dateadj_data["launch_year"] =  pd.to_datetime(model_data["launch_year"],format="%Y").dt.year
+    dateadj_data["last_updated_utc"] =  pd.to_datetime(df["last_updated_utc"])
+    dateadj_data["kpi_summary->last_update_date_utc"] =  pd.to_datetime(df["kpi_summary->last_update_date_utc"])
+    dateadj_data["created_utc"] =  pd.to_datetime(df["created_utc"])
+    dateadj_data["launch_year"] =  pd.to_datetime(df["launch_year"],format="%Y").dt.year
 
     #new columns with cos and sin data for month. year will be same. dropping old ones
     dateadj_data["last_updated_month_cos"]=np.cos(2 * np.pi * dateadj_data["last_updated_utc"].dt.month/12.0)
@@ -112,3 +111,7 @@ def predict_pipeline(searchlist:list,api):
                                     )
 
     return model.predict(y_to.xs)
+
+
+print(predict_pipeline(["apple.com"],api="66b3d061c986162ed7cbcb50a3f8e9b07d6a3aed"))
+

@@ -1,0 +1,34 @@
+curl --request POST \
+  --url https://api.dealroom.co/api/v1/companies \
+  --header 'Authorization: Basic NjZiM2QwNjFjOTg2MTYyZWQ3Y2JjYjUwYTNmOGU5YjA3ZDZhM2FlZDo=' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "keyword": "Dealroom.co",
+  "keyword_type": "default",
+  "keyword_match_type": "fuzzy",
+  "form_data": {
+    "must": {
+      "last_updated": "2016-12-10 00:00:00",
+      "industries": [
+        "fintech"
+      ],
+      "hq_locations": [
+        "Europe"
+      ]
+    },
+    "must_not": {
+      "client_focus": [
+        "consumer"
+      ]
+    },
+    "should": {
+      "fundings": [
+        "0-10M"
+      ]
+    }
+  },
+  "fields": "id,name,path,images(32x32,74x74,100x100),tagline,hq_locations(id,address),growth_stage,employees,traffic_summary,total_funding,last_updated",
+  "sort": "name",
+  "limit": 1,
+  "offset": 0
+}'
