@@ -18,4 +18,4 @@ def home():
 @app.post("/predict",response_model=PredictionOut)
 def predict(payload: ListIn):
     score = predict_pipeline(payload.list,"66b3d061c986162ed7cbcb50a3f8e9b07d6a3aed")
-    return {"score": prediction}
+    return {"score": score}
