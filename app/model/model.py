@@ -102,11 +102,10 @@ def predict_pipeline(searchlist:list,api):
         df=df[cols]
 
         row, cls, probs  = model.predict(df.iloc[0]) 
-        a=[df.iloc[0]["name"], cls, probs]
+        a={"name":df.iloc[0]["name"],"prediction": cls,"tensor": probs}
     except:
-        a="your URL has resulted in no return"
-    return a
+        a={"error":"your URL has resulted in no return"}
+    return df.iloc[0]["name"],cls, probs
 
 
 
-print(predict_pipeline(["dog.com"],"66b3d061c986162ed7cbcb50a3f8e9b07d6a3aed"))
