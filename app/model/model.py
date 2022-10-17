@@ -10,7 +10,7 @@ from fastai.data import *
 from fastai.tabular import *
 from fastai.tabular.all import *
 from fastai.vision.all import *
-from pandas.io.json import json_normalize
+from pandas import json_normalize
 from requests.auth import HTTPBasicAuth
 from sklearn.preprocessing import MultiLabelBinarizer
 
@@ -60,23 +60,53 @@ def list_finder(companylist:list, api, fields="id,name,type,deleted,path,tagline
         
     return data_list
 
+def extractor(json_dic):
+    """
+    Function takes in json data and transforms it to dataframe. Values in dictionary form will not be transformed
+    """
+    df_1=json_normalize(json_dic,sep="->")
+    for i in list(df_1.columns):
+        try:
+            if pd.json_normalize(json_dic,record_path="{}".format(i)).empty:
+                df_1=df_1
+            else:
+                df_2=pd.json_normalize(json_dic[0],record_path="{}".format(i),meta=["id"],meta_prefix="{}->".format(i), sep=",") 
+            
+            #problem: Will also turn normal lists into DF with column name 0
+            #new if clause will rename those columns to original name:
+                if df_2.columns[0]==0:
+                    df_2.rename(columns={df_2.columns[0]: ''.format(i)}, inplace=True)
+                else:
+                    None
+                
+            df_1=pd.merge(df_1,df_2, left_on="id",right_on="{}->id".format(i),how="left",suffixes=('', '->{}'.format(i)))
+            df_1.drop("{}".format(i),axis=1,inplace=True)
+        except:
+            df_1=df_1
+        else:
+            df_1=json_normalize(json_dic[0],sep="->") 
+            
+    return df_1
+
 
 def predict_pipeline(searchlist:list,api):
-    
-    #Select only the fields the model uses:
-    data=list_finder(searchlist,api) #has to be website URL
-    df=pd.json_normalize(data[0])
+    try:
+        #Select only the fields the model uses:
+        data=list_finder(searchlist,api) #has to be website URL
+        df=extractor(data)
 
 
-    #1. chosing the columns need for the model and applying the model
+        #1. chosing the columns need for the model and applying the model
 
-    cols=['name', 'type', 'employees', 'employees_latest', 'growth_stage', 'traffic_summary', 'launch_year', 'has_promising_founder', 'has_strong_founder', 'has_super_founder', 'total_funding', 'last_funding', 'company_status', 'last_updated_utc', 'created_utc', 'employee_3_months_growth_unique', 'job_openings']
-    df=df[cols]
+        cols=['name', 'type', 'employees', 'employees_latest', 'growth_stage', 'traffic_summary', 'launch_year', 'has_promising_founder', 'has_strong_founder', 'has_super_founder', 'total_funding', 'last_funding', 'company_status', 'last_updated_utc', 'created_utc', 'employee_3_months_growth_unique', 'job_openings']
+        df=df[cols]
 
-    row, cls, probs  = model.predict(df.iloc[0]) 
+        row, cls, probs  = model.predict(df.iloc[0]) 
+        a=[df.iloc[0]["name"], cls, probs]
+    except:
+        a="your URL has resulted in no return"
+    return a
 
-    return [df.iloc[0]["name"], cls, probs]
 
 
-
-print(predict_pipeline("dog.com","66b3d061c986162ed7cbcb50a3f8e9b07d6a3aed"))
+print(predict_pipeline(["dog.com"],"66b3d061c986162ed7cbcb50a3f8e9b07d6a3aed"))
