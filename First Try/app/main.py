@@ -20,7 +20,7 @@ def home():
 
 @app.post("/predict",response_model=PredictionOut)
 def predict(payload: ListIn):
-    name, prediction, tensor = predict_pipeline(payload.request,"66b3d061c986162ed7cbcb50a3f8e9b07d6a3aed")
+    name, prediction, tensor = predict_pipeline(payload.request,"")
     prediction= int(prediction)
     tensor= tuple(tensor.tolist())
     return {"name":name,"prediction":prediction,"tensor":tensor}
