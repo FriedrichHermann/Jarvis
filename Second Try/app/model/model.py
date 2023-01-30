@@ -245,6 +245,7 @@ def imputer(df):
     
     
 def predict_pipeline(input_dict:dict):
+    print(maker)
     df=pd.json_normalize(input_dict)
     df=data_cleaning(df)
     df=imputer(df)
