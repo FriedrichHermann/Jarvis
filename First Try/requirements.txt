@@ -1,8 +1,0 @@
-fastcore==1.5.27
-path==13.1.0
-pydantic==1.9.2
-fastai==2.7.9
-pandas==1.4.4
-xgboost==1.6.2
-requests
-sklearn

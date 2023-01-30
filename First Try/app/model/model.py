@@ -10,7 +10,7 @@ from fastai.data import *
 from fastai.tabular import *
 from fastai.tabular.all import *
 from fastai.vision.all import *
-from pandas import json_normalize
+from pandas import json_normalizeo
 from requests.auth import HTTPBasicAuth
 from sklearn.preprocessing import MultiLabelBinarizer
 
