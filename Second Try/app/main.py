@@ -12,21 +12,22 @@ from fastapi.exceptions import RequestValidationError
 
 
 class ListIn(BaseModel):
-    name:str 
-    hasValidDomain:int = 0 
-    linkedin_url:str = ""
-    industry_name:str = "" 
-    founders_university:list = []
-    investors:list = []
-    fundings_year:list =[]
-    total_funding:int = 0
-    fundings_month:list =[]
-    launch_year:int = 2022
-    fundings_total:int = 0
-    country_name: Optional[str] = None
+    name:Optional[str]=""
+    hasValidDomain:Optional[int] = 0 
+    linkedin_url:Optional[str] = ""
+    industry_name:Optional[str] = "" 
+    founders_university:Optional[list] = []
+    founders_background:Optional[list] = []
+    investors:Optional[list] = []
+    fundings_year:Optional[list] =[]
+    total_funding:Optional[int] = 0
+    fundings_month:Optional[list] =[]
+    launch_year:Optional[int] = 2022
+    fundings_total:Optional[int] = 0
+    country_name: Optional[str] = None # if both are none, the model will impute Germany 
     city_name: Optional[str] = None
-    about: str = ""
-    patents_count:int  = 0
+    about: Optional[str] = ""
+    patents_count:Optional[int]  = 0
         
 
 
@@ -39,7 +40,7 @@ def predict(Item: ListIn):
     items=Item.dict()
     a=predict_pipeline(items)
     pred=a[0].tolist()
-    return {"Prediction":pred}
+    return {Item.name:pred}
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):

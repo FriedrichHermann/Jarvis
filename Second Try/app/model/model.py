@@ -168,16 +168,19 @@ def data_cleaning(df):
     df.loc[total_funding_bol&investors_total_bol&fundings_year_bol,"is_bootstrapped"]=1
     
     
-    # 7 Missing Values
+    for i in df.columns:
+        if isinstance(df[i][0],np.ndarray):
+            if df[i][0].size == 0:
+               df[i][0]==None 
+        elif (df[i][0]=="" or df[i][0]==0 or df[i][0]==[]):
+            df[i][0]==None 
     df.loc[df["is_bootstrapped"]==1,"total_funding"]=0
     df.loc[df["is_bootstrapped"]==1,"avg_time_funding"]=0
     df.loc[df["is_bootstrapped"]==1,"fundings_total"]=0
     df.loc[df["is_bootstrapped"]==1,"investors"]=0
-    df_missval=df[["launch_year","industry_name","country_name","total_funding","about","patents_count","founders_university","investors"]]
-    df["missing_values"]=df_missval.isnull().sum(axis=1)
+    df["missing_values"]=df.isnull().sum(axis=1)
     
     return df
-    
     
 def imputer(df):
     # Impute total_funding
@@ -245,7 +248,6 @@ def imputer(df):
     
     
 def predict_pipeline(input_dict:dict):
-    print(maker)
     df=pd.json_normalize(input_dict)
     df=data_cleaning(df)
     df=imputer(df)
