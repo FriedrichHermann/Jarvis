@@ -20,7 +20,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
-__version__="0.1.0"
+__version__="0.1.1"
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent
 
@@ -49,12 +49,18 @@ with open(f"{BASE_DIR}/Encoders/univ_scorer.json", 'r') as fp:
 with open(f"{BASE_DIR}/Encoders/inv_scorer.json", 'r') as fp:
     inv_scorer = json.load(fp)
     
+with open(f"{BASE_DIR}/Encoders/backgr_scorer.json", 'r') as fp:
+    backgr_scorer = json.load(fp)
+    
 #Datasets
     
 with open(f"{BASE_DIR}/Data/df_mode.pkl","rb") as f:
     df_mode = pd.read_pickle(f)
     
-with open(f"{BASE_DIR}/ML Models/funding_xgb_2.pkl","rb") as f:
+with open(f"{BASE_DIR}/ML Models/funding_xgb.pkl","rb") as f:
+    funding_xgb = pd.read_pickle(f)
+    
+with open(f"{BASE_DIR}/ML Models/funding_IPO.pkl","rb") as f:
     funding_xgb = pd.read_pickle(f)
 
 
@@ -152,6 +158,11 @@ def data_cleaning(df):
     df["top_schools_score"]=df.founders_university.map(lambda p: sum([univ_scorer[x] for x in p if x in univ_scorer.keys()]) if isinstance(p,list) else 0)
     df["number_schools"]=df["founders_university"].map(lambda p: len(p))
     
+    # 2. Founders Background Score (list)
+    df["founders_background"]=list(map(lambda p: [similar(x,backgr_scorer) for x in p] if isinstance(p,list) else [], df.founders_background))
+    df["backgr_score"]=df.founders_background.map(lambda p: sum([backgr_scorer[x] for x in p if x in backgr_scorer.keys()]) if isinstance(p,list) else 0)
+
+    
     # 3 Investor Score (list)
     df["investors"]=list(map(lambda p: [similar(x,inv_scorer) for x in p] if isinstance(p,list) else 0, df.investors))
     a=map(lambda p: sum([inv_scorer[x] for x in p if x in inv_scorer.keys()]) if isinstance(p,list) else 0, df.investors)
@@ -169,7 +180,7 @@ def data_cleaning(df):
     for i in indexers:
         df.loc[i,"avg_time_funding"]=avg_fund_func(df.iloc[i:i+1])
         
-    for i in df.columns:
+    for i in [a for a in df.columns not in ["top_inv_score","top_schools_score","avg_time_funding","city_name","patents_count"]]:
         if isinstance(df[i][0],np.ndarray):
             if (df[i][0].size == 0):
                df[i][0]=None 
@@ -261,12 +272,19 @@ def imputer(df):
     df.loc[:, ~df.columns.isin(["country_name","industry_name"])]=df.drop(columns=["country_name","industry_name"]).fillna(0)
     return df[['name','about','website_url','linkedin_url','total_funding','patents_count','launch_year',
                'investors_total','fundings_total','country_name','industry_name',
-               'top_inv_score','top_schools_score','number_schools','avg_time_funding','is_bootstrapped','missing_values']]
+               'top_inv_score','top_schools_score','number_schools','avg_time_funding','is_bootstrapped','missing_values',"backgr_score"]]
     
     
-def predict_pipeline(input_dict:dict):
+def predict_pipeline_funding(input_dict:dict):
     df=pd.json_normalize(input_dict)
     df=data_cleaning(df)
     df=imputer(df)
     a=funding_xgb.predict_proba(df.drop(columns=["name"]))
+    return a
+
+def predict_pipeline_IPO(input_dict:dict):
+    df=pd.json_normalize(input_dict)
+    df=data_cleaning(df)
+    df=imputer(df)
+    a=funding_IPO.predict_proba(df.drop(columns=["name"]))
     return a

@@ -7,7 +7,6 @@ from typing import Optional
 
 app=FastAPI()
 
-from fastapi.exceptions import RequestValidationError
 
 
 
@@ -35,13 +34,16 @@ class ListIn(BaseModel):
 def home():
     return{"health_check":"OK","model_version":model_version}
 
-@app.post("/predict")
+@app.post("/predict/funding")
 def predict(Item: ListIn):
     items=Item.dict()
-    a=predict_pipeline(items)
-    pred=a[0].tolist()
+    a=predict_pipeline_funding(items)
+    pred=np.around(a[0], decimals=3).tolist()
     return {Item.name:pred}
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    return PlainTextResponse(str(exc), status_code=400)
+@app.post("/predict/IPO")
+def predict(Item: ListIn):
+    items=Item.dict()
+    a=predict_pipeline_IPO(items)
+    pred=np.around(a[0], decimals=3).tolist()
+    return {Item.name:pred}
