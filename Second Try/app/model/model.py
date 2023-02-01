@@ -66,6 +66,17 @@ def translator(p):
         return a.lower().split(",")[0]
     else:
         None
+
+def lower_split(p):
+    try:
+        words=[]
+        for i in range(len(p)):
+            words.extend(p[i].lower().split(","))
+        
+        return words
+    except:
+        None
+
         
 def industry_conv(p):
     try:
@@ -132,8 +143,9 @@ def tokenizer(x:str):
 #The Following function will implement the entire datatransformation routine
 def data_cleaning(df):
     # 1. Industry Fields (str)
+    df["industry_name"]=df["industry_name"].map(lambda p: p.lower().split(",")[0])
     df["industry_name"]=df["industry_name"].map(translator)
-    df["industry_name"]=df["industry_name"].map(lambda p: industries_dict[p] if p in list(industries_dict.keys()) else None)
+    
     
     # 2. Founders University Score (list)
     df["founders_university"]=list(map(lambda p: [similar(x,univ_scorer) for x in p] if isinstance(p,list) else [], df.founders_university))
@@ -157,6 +169,18 @@ def data_cleaning(df):
     for i in indexers:
         df.loc[i,"avg_time_funding"]=avg_fund_func(df.iloc[i:i+1])
         
+    for i in df.columns:
+        if isinstance(df[i][0],np.ndarray):
+            if (df[i][0].size == 0):
+               df[i][0]=None 
+        elif (df[i][0]==""):
+            df[i][0]=None 
+        elif (df[i][0]==0):
+            df[i][0]=None 
+        elif isinstance(df[i][0],list):
+            if (len(df[i][0]) == 0):
+               df[i][0]=None
+        
     # 5 Is Bootstrapped
     for i in df.columns:
         df[i]=df[i].map(lambda p: None if ((isinstance(p,list) and len(p)==0) or (isinstance(p,np.ndarray) and len(p)==0)) else p)
@@ -167,22 +191,19 @@ def data_cleaning(df):
 
     df.loc[total_funding_bol&investors_total_bol&fundings_year_bol,"is_bootstrapped"]=1
     
-    
-    for i in df.columns:
-        if isinstance(df[i][0],np.ndarray):
-            if df[i][0].size == 0:
-               df[i][0]==None 
-        elif (df[i][0]=="" or df[i][0]==0 or df[i][0]==[]):
-            df[i][0]==None 
+    # 7 Missing Values
     df.loc[df["is_bootstrapped"]==1,"total_funding"]=0
     df.loc[df["is_bootstrapped"]==1,"avg_time_funding"]=0
     df.loc[df["is_bootstrapped"]==1,"fundings_total"]=0
     df.loc[df["is_bootstrapped"]==1,"investors"]=0
     df["missing_values"]=df.isnull().sum(axis=1)
     
-    return df
+    return df 
+    
     
 def imputer(df):
+    #industries
+    df["industry_name"]=df["industry_name"].map(lambda p: industries_dict[p] if p in list(industries_dict.keys()) else None)
     # Impute total_funding
     df_mice = df_mode.filter(['total_funding', 'fundings_total', 'launch_year',"avg_time_funding","number_top_schools","is_bootstrapped"], axis=1)
     to_be_imp_ind=df.loc[df["is_bootstrapped"]!=1].index
@@ -192,7 +213,7 @@ def imputer(df):
     needed_rows=to_be_imp.shape[0]
     mice_imputer = IterativeImputer(estimator=KNeighborsRegressor(n_neighbors=5), n_nearest_features=None, imputation_order='ascending', missing_values=np.nan, min_value = 0.0)
     df_mice_imputed = pd.DataFrame(mice_imputer.fit_transform(df_mice), columns=df_mice.columns)
-    df.loc[to_be_imp_ind,"total_funding"]=df_mice_imputed.tail(n=needed_rows)["total_funding"].values
+    df.loc[to_be_imp_ind,"total_funding"]=df_mice_imputed["total_funding"].tail(n=needed_rows).values
     
     #Impute total_fundings
     if (df["fundings_total"][0]==0) & (df["total_funding"][0]!=0):
@@ -214,16 +235,11 @@ def imputer(df):
             df.loc[i,"country_name"]=country_getter(df.iloc[i])
     else:
         df["country_name"]="Germany"
-    
+
     if (~df["country_name"].isna()[0]):
         df["country_name"]=df["country_name"].map(lambda p: translator(p).title())
         label=country_enc.transform(df.country_name)
         df["country_name"]=label
-    
-    
-    
-    # Transformer of Country
-    
     
     # About
     stop_words=set(stopwords.words('english'))
@@ -235,16 +251,17 @@ def imputer(df):
     
     # Domain
     df["website_url"]=df["hasValidDomain"].map(lambda p: p[0] if isinstance(p,list) else p)
-    df["linkedin_url"]=df["linkedin_url"].map(lambda p: 1 if isinstance(p,str) else 0)
+    df["linkedin_url"]=df["linkedin_url"].map(lambda p: 1 if (isinstance(p,str) and len(p)!=0) else 0)
     
     #Launch Year
     mean_year=np.mean(df.loc[~(df["launch_year"]<=0),"launch_year"])
     df.loc[(df["launch_year"]<=0),"launch_year"]=mean_year
     df["launch_year"]=currentYear-df["launch_year"]
+    
+    df.loc[:, ~df.columns.isin(["country_name","industry_name"])]=df.drop(columns=["country_name","industry_name"]).fillna(0)
     return df[['name','about','website_url','linkedin_url','total_funding','patents_count','launch_year',
                'investors_total','fundings_total','country_name','industry_name',
                'top_inv_score','top_schools_score','number_schools','avg_time_funding','is_bootstrapped','missing_values']]
-    
     
     
 def predict_pipeline(input_dict:dict):
