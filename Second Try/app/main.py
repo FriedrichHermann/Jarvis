@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from app.model.model import predict_pipeline
+from app.model.model import predict_pipeline_funding
+from app.model.model import predict_pipeline_IPO
 from app.model.model import __version__ as model_version
 import numpy as np
 from typing import Optional
@@ -38,12 +39,14 @@ def home():
 def predict(Item: ListIn):
     items=Item.dict()
     a=predict_pipeline_funding(items)
-    pred=np.around(a[0], decimals=3).tolist()
+    pred=np.around(a[0], 4).tolist()
+    pred=list(pred)
     return {Item.name:pred}
 
 @app.post("/predict/IPO")
 def predict(Item: ListIn):
     items=Item.dict()
     a=predict_pipeline_IPO(items)
-    pred=np.around(a[0], decimals=3).tolist()
+    pred=np.around(a[0], 4).tolist()
+
     return {Item.name:pred}

@@ -60,8 +60,8 @@ with open(f"{BASE_DIR}/Data/df_mode.pkl","rb") as f:
 with open(f"{BASE_DIR}/ML Models/funding_xgb.pkl","rb") as f:
     funding_xgb = pd.read_pickle(f)
     
-with open(f"{BASE_DIR}/ML Models/funding_IPO.pkl","rb") as f:
-    funding_xgb = pd.read_pickle(f)
+with open(f"{BASE_DIR}/ML Models/IPO_xgb.pkl","rb") as f:
+    IPO_xgb = pd.read_pickle(f)
 
 
 
@@ -180,7 +180,7 @@ def data_cleaning(df):
     for i in indexers:
         df.loc[i,"avg_time_funding"]=avg_fund_func(df.iloc[i:i+1])
         
-    for i in [a for a in df.columns not in ["top_inv_score","top_schools_score","avg_time_funding","city_name","patents_count"]]:
+    for i in [a for a in list(df.columns) if a not in ["top_inv_score","top_schools_score","avg_time_funding","city_name","patents_count"]]:
         if isinstance(df[i][0],np.ndarray):
             if (df[i][0].size == 0):
                df[i][0]=None 
@@ -286,5 +286,5 @@ def predict_pipeline_IPO(input_dict:dict):
     df=pd.json_normalize(input_dict)
     df=data_cleaning(df)
     df=imputer(df)
-    a=funding_IPO.predict_proba(df.drop(columns=["name"]))
+    a=IPO_xgb.predict_proba(df.drop(columns=["name"]))
     return a
