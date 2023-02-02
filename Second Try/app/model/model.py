@@ -156,7 +156,7 @@ def data_cleaning(df):
     # 2. Founders University Score (list)
     df["founders_university"]=list(map(lambda p: [similar(x,univ_scorer) for x in p] if isinstance(p,list) else [], df.founders_university))
     df["top_schools_score"]=df.founders_university.map(lambda p: sum([univ_scorer[x] for x in p if x in univ_scorer.keys()]) if isinstance(p,list) else 0)
-    df["number_schools"]=df["founders_university"].map(lambda p: len(p))
+    df["number_schools"]=df["founders_university"].map(lambda p: len(p) if (len(p)>0 and str(p[0])!="None") else 0)
     
     # 2. Founders Background Score (list)
     df["founders_background"]=list(map(lambda p: [similar(x,backgr_scorer) for x in p] if isinstance(p,list) else [], df.founders_background))
@@ -168,7 +168,7 @@ def data_cleaning(df):
     a=map(lambda p: sum([inv_scorer[x] for x in p if x in inv_scorer.keys()]) if isinstance(p,list) else 0, df.investors)
     b=list(a)
     df["top_inv_score"]=b
-    a=map(lambda p: len(p) if isinstance(p,list) else p, df.investors)
+    a=map(lambda p: len(p) if (len(p)>0 and str(p[0])!="None") else 0, df.investors)
     b=list(a)
     df["investors_total"]=b
     
@@ -180,7 +180,7 @@ def data_cleaning(df):
     for i in indexers:
         df.loc[i,"avg_time_funding"]=avg_fund_func(df.iloc[i:i+1])
         
-    for i in [a for a in list(df.columns) if a not in ["top_inv_score","top_schools_score","avg_time_funding","city_name","patents_count"]]:
+    for i in [a for a in list(df.columns) if a not in ["avg_time_funding","city_name","patents_count"]]:
         if isinstance(df[i][0],np.ndarray):
             if (df[i][0].size == 0):
                df[i][0]=None 
@@ -202,6 +202,7 @@ def data_cleaning(df):
 
     df.loc[total_funding_bol&investors_total_bol&fundings_year_bol,"is_bootstrapped"]=1
     
+    
     # 7 Missing Values
     df.loc[df["is_bootstrapped"]==1,"total_funding"]=0
     df.loc[df["is_bootstrapped"]==1,"avg_time_funding"]=0
@@ -209,7 +210,7 @@ def data_cleaning(df):
     df.loc[df["is_bootstrapped"]==1,"investors"]=0
     df["missing_values"]=df.isnull().sum(axis=1)
     
-    return df 
+    return df
     
     
 def imputer(df):
