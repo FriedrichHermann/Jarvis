@@ -12,6 +12,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import json 
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -20,7 +22,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
-__version__="0.1.1"
+__version__="0.1.4"
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent
 
@@ -35,11 +37,19 @@ with open(f"{BASE_DIR}/Encoders/Imputers/Industry_encoder.pkl","rb") as f:
     
 with open(f"{BASE_DIR}/Encoders/Imputers/Country_encoder.pkl","rb") as f:
     country_enc = pd.read_pickle(f)
+
+with open(f"{BASE_DIR}/Encoders/Imputers/lbin_ind.pkl","rb") as f:
+    industry_onehot = pd.read_pickle(f)
     
+with open(f"{BASE_DIR}/Encoders/Imputers/lbin_count.pkl","rb") as f:
+    country_onehot = pd.read_pickle(f)
 #Transformation
     
 with open(f"{BASE_DIR}/Encoders/Imputers/industries_dict.json","rb") as f:
     industries_dict = json.load(f)
+    
+with open(f"{BASE_DIR}/Encoders/Imputers/scaler.pkl","rb") as f:
+    scaler = pd.read_pickle(f)
     
 #Scorer
 
@@ -57,12 +67,24 @@ with open(f"{BASE_DIR}/Encoders/backgr_scorer.json", 'r') as fp:
 with open(f"{BASE_DIR}/Data/df_mode.pkl","rb") as f:
     df_mode = pd.read_pickle(f)
     
-with open(f"{BASE_DIR}/ML Models/funding_xgb.pkl","rb") as f:
-    funding_xgb = pd.read_pickle(f)
+with open(f"{BASE_DIR}/Data/needed_rows.pkl","rb") as f:
+    needed_rows = pd.read_pickle(f)
+    
+with open(f"{BASE_DIR}/Data/testy.pkl","rb") as f:
+    testy = pd.read_pickle(f)
+    
+with open(f"{BASE_DIR}/Data/testX.pkl","rb") as f:
+    testX = pd.read_pickle(f)
+    
+    
+with open(f"{BASE_DIR}/ML Models/cat_modl.pkl","rb") as f:
+    funding_model = pd.read_pickle(f)
     
 with open(f"{BASE_DIR}/ML Models/IPO_xgb.pkl","rb") as f:
     IPO_xgb = pd.read_pickle(f)
 
+with open(f"{BASE_DIR}/ML Models/0_1_xgb.pkl","rb") as f:
+    nulleins_xgb = pd.read_pickle(f)
 
 
 # Functions that are used by following routines:
@@ -118,10 +140,10 @@ def avg_time(x,y):
     return avg_fund
 
 def avg_fund_func(x):
-    if (isinstance(x["fundings_month"].iloc[0],np.ndarray) and len(x["fundings_month"].iloc[0])==0):
-        if (isinstance(x["fundings_year"].iloc[0],np.ndarray) and len(x["fundings_year"].iloc[0])==0):
+    if x["fundings_month"].isnull().iloc[0]:
+        if x["fundings_year"].isnull().iloc[0]:
             a=currentYear*12-int(x["launch_year"].iloc[0])*12+currentMonth
-            if ~x["total_funding"].isnull().iloc[0]:
+            if ~x["number_fundings"].isnull().iloc[0]:
                 a=a/2
             else:
                 None
@@ -145,7 +167,20 @@ def tokenizer(x:str):
     tokens=word_tokenize(x)
     tokens = [w for w in tokens if w not in stop_words]
     return tokens
+# Variables
 
+cont_cols=['about',
+ 'total_funding',
+ 'patents_count',
+ 'launch_year',
+ 'investors_total',
+ 'number_fundings',
+ 'top_inv_score',
+ 'top_schools_score',
+ 'number_schools',
+ 'avg_time_funding',
+ 'backgr_score',
+ 'missing_values'] # gives all the continous fields in the dataset
 #The Following function will implement the entire datatransformation routine
 def data_cleaning(df):
     # 1. Industry Fields (str)
@@ -172,13 +207,6 @@ def data_cleaning(df):
     b=list(a)
     df["investors_total"]=b
     
-    # 4 Avg time funding (fundings_month: np.ndarray, fundings_year: np.ndarray, launch_year: int)
-    df["fundings_year"]=df["fundings_year"].map(lambda p: np.array(p) if isinstance(p,list)  else p)
-    df["fundings_month"]=df["fundings_month"].map(lambda p: np.array(p) if isinstance(p,list)  else p)
-    df["avg_time_funding"]=0
-    indexers=df[df["launch_year"].apply(lambda p: False if (isinstance(p,list)) else True)].index
-    for i in indexers:
-        df.loc[i,"avg_time_funding"]=avg_fund_func(df.iloc[i:i+1])
         
     for i in [a for a in list(df.columns) if a not in ["avg_time_funding","city_name","patents_count"]]:
         if isinstance(df[i][0],np.ndarray):
@@ -197,16 +225,19 @@ def data_cleaning(df):
         df[i]=df[i].map(lambda p: None if ((isinstance(p,list) and len(p)==0) or (isinstance(p,np.ndarray) and len(p)==0)) else p)
     df["is_bootstrapped"]=0
     total_funding_bol=(df["total_funding"].apply(lambda p: True if (str(p)=="nan" or str(p)=="None") else False ))
+    number_fundings_bol=(df["number_fundings"].apply(lambda p: True if (str(p)=="nan" or str(p)=="None") else False ))
     investors_total_bol=(df["investors_total"].apply(lambda p: True if (str(p)=="nan" or str(p)=="None") else False))
     fundings_year_bol=(df["fundings_year"].apply(lambda p: True if (str(p)=="nan" or str(p)=="None") else False))
 
-    df.loc[total_funding_bol&investors_total_bol&fundings_year_bol,"is_bootstrapped"]=1
+    df.loc[total_funding_bol&investors_total_bol&fundings_year_bol&number_fundings_bol,"is_bootstrapped"]=1
     
+    df["fundings_year"]=df["fundings_year"].map(np.array)
+    df["fundings_month"]=df["fundings_month"].map(np.array)
     
     # 7 Missing Values
     df.loc[df["is_bootstrapped"]==1,"total_funding"]=0
     df.loc[df["is_bootstrapped"]==1,"avg_time_funding"]=0
-    df.loc[df["is_bootstrapped"]==1,"fundings_total"]=0
+    df.loc[df["is_bootstrapped"]==1,"number_fundings"]=0
     df.loc[df["is_bootstrapped"]==1,"investors"]=0
     df["missing_values"]=df.isnull().sum(axis=1)
     
@@ -215,28 +246,7 @@ def data_cleaning(df):
     
 def imputer(df):
     #industries
-    df["industry_name"]=df["industry_name"].map(lambda p: industries_dict[p] if p in list(industries_dict.keys()) else None)
-    # Impute total_funding
-    df_mice = df_mode.filter(['total_funding', 'fundings_total', 'launch_year',"avg_time_funding","number_top_schools","is_bootstrapped"], axis=1)
-    to_be_imp_ind=df.loc[df["is_bootstrapped"]!=1].index
-    to_be_imp=df.loc[df["is_bootstrapped"]!=1]
-    to_be_imp=to_be_imp.filter(['total_funding', 'fundings_total', 'launch_year',"avg_time_funding","number_top_schools","is_bootstrapped"], axis=1)
-    df_mice=pd.concat([df_mice,to_be_imp],ignore_index=True)
-    needed_rows=to_be_imp.shape[0]
-    mice_imputer = IterativeImputer(estimator=KNeighborsRegressor(n_neighbors=5), n_nearest_features=None, imputation_order='ascending', missing_values=np.nan, min_value = 0.0)
-    df_mice_imputed = pd.DataFrame(mice_imputer.fit_transform(df_mice), columns=df_mice.columns)
-    df.loc[to_be_imp_ind,"total_funding"]=df_mice_imputed["total_funding"].tail(n=needed_rows).values
-    
-    #Impute total_fundings
-    if (df["fundings_total"][0]==0) & (df["total_funding"][0]!=0):
-        median_funding=np.median(df_mode.loc[df_mode["is_bootstrapped"]!=1,"total_funding"])
-        def upper_bound(p):
-            if p<=5:
-                return p
-            else:
-                return 5
-
-        df.loc[df["fundings_total"]==0,"fundings_total"]=upper_bound(np.round(df.loc[df["fundings_total"]==0,"total_funding"].values/median_funding))
+    df["industry_name"]=df["industry_name"].map(lambda p: industries_dict[p] if p in list(industries_dict.keys()) else None)   
     
     # Impute patents count
     df.loc[df["patents_count"].apply(lambda p: True if (str(p) == "None" or str(p)=="nan") else False),"patents_count"]=0
@@ -252,6 +262,9 @@ def imputer(df):
         df["country_name"]=df["country_name"].map(lambda p: translator(p).title())
         label=country_enc.transform(df.country_name)
         df["country_name"]=label
+        
+    df=df.join(pd.DataFrame(country_onehot.transform(df["country_name"].values.reshape(-1,1)),columns=needed_rows[104-57:]+["nan_0"]))
+    df=df.join(pd.DataFrame(industry_onehot.transform(df["industry_name"].values.reshape(-1,1)),columns=needed_rows[104-57-31:(104-57)]+["nan_1"]))
     
     # About
     stop_words=set(stopwords.words('english'))
@@ -264,28 +277,49 @@ def imputer(df):
     # Domain
     df["website_url"]=df["hasValidDomain"].map(lambda p: p[0] if isinstance(p,list) else p)
     df["linkedin_url"]=df["linkedin_url"].map(lambda p: 1 if (isinstance(p,str) and len(p)!=0) else 0)
+ 
+    wanted_for_imp=['launch_year','about','patents_count','top_schools_score','number_schools','backgr_score','top_inv_score','investors_total','is_bootstrapped','missing_values',"total_funding"]
+     # Impute total_funding
+    if (df["total_funding"].isnull()[0] and df["is_bootstrapped"]!=1):
+        t=df["investors_total"]
+        df["total_funding"]=np.median(df_mode.loc[(df_mode["number_fundings"]!=0)&(df_mode["investors_total"]==t)&(df_mode["is_bootstrapped"]==0),"total_funding"])
+
+     
+    if (df["number_fundings"].isnull()[0] and df["is_bootstrapped"]!=1):
+        t=df["investors_total"]
+        df["number_fundings"]=np.median(df_mode.loc[(df_mode["number_fundings"]!=0)&(df_mode["investors_total"]==t)&(df_mode["is_bootstrapped"]==0),"number_fundings"])
+
+    # 4 Avg time funding (fundings_month: np.ndarray, fundings_year: np.ndarray, launch_year: int)
+    df["avg_time_funding"]=0
+    df["avg_time_funding"]=avg_fund_func(df)
     
     #Launch Year
     mean_year=np.mean(df.loc[~(df["launch_year"]<=0),"launch_year"])
     df.loc[(df["launch_year"]<=0),"launch_year"]=mean_year
     df["launch_year"]=currentYear-df["launch_year"]
-    
-    df.loc[:, ~df.columns.isin(["country_name","industry_name"])]=df.drop(columns=["country_name","industry_name"]).fillna(0)
-    return df[['name','about','website_url','linkedin_url','total_funding','patents_count','launch_year',
-               'investors_total','fundings_total','country_name','industry_name',
-               'top_inv_score','top_schools_score','number_schools','avg_time_funding','is_bootstrapped','missing_values',"backgr_score"]]
-    
+    if df["launch_year"][0]==0:
+        df["launch_year"]+=0.5
+
+    #needed columns for prediciton
+    df=df[needed_rows]
+    # scaling data (min/max)
+    df=df.fillna(0)
+    data=df[cont_cols]
+    data_scaled=scaler.transform(data)
+    df[cont_cols]=data_scaled
+    return df
+
+
     
 def predict_pipeline_funding(input_dict:dict):
     df=pd.json_normalize(input_dict)
     df=data_cleaning(df)
     df=imputer(df)
-    a=funding_xgb.predict_proba(df.drop(columns=["name"]))
+    a=(funding_model.predict_proba(df.drop(columns=["name"]))[:,1] >= input_dict["threshold"]).astype(int)
     return a
 
-def predict_pipeline_IPO(input_dict:dict):
-    df=pd.json_normalize(input_dict)
-    df=data_cleaning(df)
-    df=imputer(df)
-    a=IPO_xgb.predict_proba(df.drop(columns=["name"]))
-    return a
+def recall_precision(threshold):
+    y_pred=(funding_model.predict_proba(testX)[:,1] >= threshold).astype(int)
+    recall=recall_score(testy,y_pred)
+    precision=precision_score(testy,y_pred)
+    return {"recall":recall,"precision":precision,"threshold":threshold}
