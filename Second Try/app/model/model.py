@@ -22,7 +22,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
-__version__="0.1.4"
+__version__="0.2.1"
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent
 
@@ -80,11 +80,6 @@ with open(f"{BASE_DIR}/Data/testX.pkl","rb") as f:
 with open(f"{BASE_DIR}/ML Models/cat_modl.pkl","rb") as f:
     funding_model = pd.read_pickle(f)
     
-with open(f"{BASE_DIR}/ML Models/IPO_xgb.pkl","rb") as f:
-    IPO_xgb = pd.read_pickle(f)
-
-with open(f"{BASE_DIR}/ML Models/0_1_xgb.pkl","rb") as f:
-    nulleins_xgb = pd.read_pickle(f)
 
 
 # Functions that are used by following routines:
@@ -280,14 +275,14 @@ def imputer(df):
  
     wanted_for_imp=['launch_year','about','patents_count','top_schools_score','number_schools','backgr_score','top_inv_score','investors_total','is_bootstrapped','missing_values',"total_funding"]
      # Impute total_funding
-    if (df["total_funding"].isnull()[0] and df["is_bootstrapped"]!=1):
+    if (df["total_funding"].isnull()[0] and (df["is_bootstrapped"]!=1)[0]):
         t=df["investors_total"]
-        df["total_funding"]=np.median(df_mode.loc[(df_mode["number_fundings"]!=0)&(df_mode["investors_total"]==t)&(df_mode["is_bootstrapped"]==0),"total_funding"])
+        df["total_funding"]=np.median(df_mode.loc[(df_mode["number_fundings"]!=0)&(df_mode["investors_total"]!=0)&(df_mode["is_bootstrapped"]==0),"total_funding"])
 
      
-    if (df["number_fundings"].isnull()[0] and df["is_bootstrapped"]!=1):
+    if (df["number_fundings"].isnull()[0] and (df["is_bootstrapped"]!=1)[0]):
         t=df["investors_total"]
-        df["number_fundings"]=np.median(df_mode.loc[(df_mode["number_fundings"]!=0)&(df_mode["investors_total"]==t)&(df_mode["is_bootstrapped"]==0),"number_fundings"])
+        df["number_fundings"]=np.median(df_mode.loc[(df_mode["number_fundings"]!=0)&(df_mode["investors_total"]!=0)&(df_mode["is_bootstrapped"]==0),"number_fundings"])
 
     # 4 Avg time funding (fundings_month: np.ndarray, fundings_year: np.ndarray, launch_year: int)
     df["avg_time_funding"]=0
