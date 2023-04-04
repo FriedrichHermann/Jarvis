@@ -1,0 +1,45 @@
+name: Update Docker Container
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          context: ./Second Try
+          push: true
+          tags: klaus123/jarvis:latest
+
+      - name: SSH into DigitalOcean droplet and update container
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: ${{ secrets.DROPLET_USERNAME }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_SSH_PORT }}
+          script: |
+            # Pull the latest Docker image
+            docker pull klaus123/jarvis:latest
+
+            # Stop and remove the existing Docker container
+            docker stop jarvis:version_020
+            docker rm jarvis:version_020
+
+            # Start a new Docker container with the latest image
+            docker run --name jarvis:version_020 -p 8000:80 -d klaus123/jarvis:latest
