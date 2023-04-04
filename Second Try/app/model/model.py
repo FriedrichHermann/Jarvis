@@ -22,7 +22,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
-__version__="0.2.1"
+__version__="0.2.2"
 
 BASE_DIR = Path(__file__).resolve(strict=True).parent
 
